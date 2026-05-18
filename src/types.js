@@ -22,6 +22,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   audit_path: ".pi/permissions-audit.jsonl",
   persist_approvals: "project",
   approved_prefixes: [],
+  status_line: false,
   deny_read_patterns: [],
   deny_write_patterns: []
 });

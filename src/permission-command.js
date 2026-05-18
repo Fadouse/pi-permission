@@ -1,6 +1,6 @@
 import { APPROVAL_POLICIES, APPROVALS_REVIEWERS, SANDBOX_MODES, normalizeApprovalPolicy, normalizeApprovalsReviewer, normalizeSandboxMode } from "./types.js";
 
-const BOOLEAN_KEYS = new Set(["network_access", "allow_tmp_write", "audit", "fail_closed_without_sandbox"]);
+const BOOLEAN_KEYS = new Set(["network_access", "allow_tmp_write", "audit", "fail_closed_without_sandbox", "status_line"]);
 const NUMBER_KEYS = new Set(["auto_review_timeout_ms", "auto_review_max_tokens"]);
 const STRING_KEYS = new Set(["auto_review_model", "auto_review_reasoning", "sandbox_backend", "bubblewrap_command", "sandbox_exec_command", "persist_approvals"]);
 const LIST_KEYS = new Set(["add_dir"]);
@@ -15,6 +15,7 @@ const KEY_ALIASES = new Map([
   ["model", "auto_review_model"],
   ["network", "network_access"],
   ["tmp", "allow_tmp_write"],
+  ["status-line", "status_line"],
 ]);
 
 export const PERMISSION_COMMAND_USAGE = `Usage:
@@ -132,6 +133,7 @@ approvals_reviewer=${config.approvals_reviewer}
 auto_review_model=${config.auto_review_model || "(current session model)"}
 network_access=${Boolean(config.network_access)}
 add_dir=${(config.add_dir || []).join(", ") || "(none)"}
+status_line=${Boolean(config.status_line)}
 approved_prefixes=${store?.allPrefixes?.().length ?? 0}
 project_config=${configPath}`;
 }

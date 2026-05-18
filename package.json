@@ -1,6 +1,6 @@
 {
   "name": "@fadouse/pi-permission",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Native permission and sandbox extension for pi with Codex-compatible behavior.",
   "type": "module",
   "main": "src/index.js",

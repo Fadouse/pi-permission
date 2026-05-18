@@ -20,12 +20,13 @@ test("permission command clears dedicated auto_review model", () => {
 });
 
 test("permission command parses raw key value settings", () => {
-  const action = parsePermissionCommand("set sandbox=read-only approval=never reviewer=user network=false add_dir=../a,../b");
+  const action = parsePermissionCommand("set sandbox=read-only approval=never reviewer=user network=false status-line=true add_dir=../a,../b");
   assert.deepEqual(action.updater({}), {
     sandbox_mode: "read-only",
     approval_policy: "never",
     approvals_reviewer: "user",
     network_access: false,
+    status_line: true,
     add_dir: ["../a", "../b"]
   });
 });

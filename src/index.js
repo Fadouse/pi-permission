@@ -41,6 +41,13 @@ async function maybeApprovePath(ctx, config, store, toolName, path, reason) {
   return choice === "Allow once" ? { allowed: true, reason: "approved once" } : { allowed: false, reason: "Denied by user" };
 }
 
+function updateStatus(ctx, config) {
+  ctx.ui.setStatus?.(
+    "pi-permission",
+    config.status_line ? `${config.sandbox_mode}/${config.approval_policy}/${config.approvals_reviewer}` : undefined
+  );
+}
+
 export default function piPermission(pi) {
   registerFlags(pi);
   let config;
@@ -65,7 +72,7 @@ export default function piPermission(pi) {
 
   pi.on("session_start", (_event, ctx) => {
     refreshState(ctx.cwd);
-    ctx.ui.setStatus?.("pi-permission", `${config.sandbox_mode}/${config.approval_policy}/${config.approvals_reviewer}`);
+    updateStatus(ctx, config);
   });
 
   pi.on("before_agent_start", (event, ctx) => {
@@ -122,7 +129,7 @@ export default function piPermission(pi) {
       }
       saveProjectConfig(ctx.cwd, (current) => ({ ...current, ...action.updater(current) }));
       refreshState(ctx.cwd);
-      ctx.ui.setStatus?.("pi-permission", `${config.sandbox_mode}/${config.approval_policy}/${config.approvals_reviewer}`);
+      updateStatus(ctx, config);
       ctx.ui.notify(`${action.message}\nSaved to ${projectConfigPath(ctx.cwd)}\n\n${formatPermissionStatus(config, store, projectConfigPath(ctx.cwd))}`, "info");
     }
   };

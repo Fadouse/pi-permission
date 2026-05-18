@@ -49,6 +49,7 @@ Project: `.pi/permissions.json`
   "add_dir": ["../shared"],
   "network_access": false,
   "allow_tmp_write": true,
+  "status_line": false,
   "bubblewrap_command": "bwrap",
   "approved_prefixes": [
     { "rule": ["cargo", "test"], "scope": "project" }
@@ -68,6 +69,7 @@ Project config overrides global config; CLI flags override both. Use `/permissio
 /permission model clear             # use current session model for auto_review
 /permission add-dir ../shared
 /permission set network=false auto_review_timeout_ms=45000
+/permission set status_line=true      # opt in to footer status display
 ```
 
 ## Auto Review Mode
