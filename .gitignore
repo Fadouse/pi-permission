@@ -1,0 +1,4 @@
+node_modules/
+.pi/
+src/.fuse_hidden*
+.fuse_hidden*

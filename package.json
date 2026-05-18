@@ -1,0 +1,33 @@
+{
+  "name": "@fadouse/pi-permission",
+  "version": "0.1.0",
+  "description": "Native permission and sandbox extension for pi with Codex-compatible behavior.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src/*.js",
+    "README.md"
+  ],
+  "keywords": ["pi-package", "pi", "permission", "sandbox", "codex"],
+  "pi": {
+    "extensions": ["./src/index.js"]
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check:no-codex-cli-deps": "node --test test/no-codex-deps.test.js"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
