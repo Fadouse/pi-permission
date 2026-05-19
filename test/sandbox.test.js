@@ -4,9 +4,8 @@ import { bubblewrapArgs, sandboxBackend, sandboxFailureText } from "../src/sandb
 
 const cwd = process.cwd();
 
-test("uses native backend, not Codex CLI", () => {
+test("uses supported native backend", () => {
   const backend = sandboxBackend({ sandbox_mode: "workspace-write" });
-  assert.notEqual(backend, "codex");
   assert.ok(["bubblewrap", "seatbelt", "unsupported"].includes(backend));
 });
 

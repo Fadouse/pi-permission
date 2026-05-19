@@ -13,7 +13,7 @@ test("detects complex shell syntax for prefix safety", () => {
   assert.equal(commandMatchesPrefix("cargo test > out", ["cargo", "test"]), false);
 });
 
-test("trusted commands match Codex-style read-only set", () => {
+test("trusted commands match built-in read-only set", () => {
   assert.equal(isTrustedCommand("ls -la && git diff"), true);
   assert.equal(isTrustedCommand("find . -name '*.js'"), false, "globs make prefix/trust matching complex");
   assert.equal(isTrustedCommand("find . -delete"), false);

@@ -28,9 +28,16 @@ async function maybeApprovePath(ctx, config, store, toolName, path, reason) {
     const review = await reviewApprovalRequestWithModel({ type: "file", toolName, path, reason }, ctx, config);
     const decision = formatReviewDecision(review);
     ctx.ui.notify?.(decision, review.outcome === "allow" ? "info" : "warning");
-    return review.outcome === "allow"
-      ? { allowed: true, reason: decision, review }
-      : { allowed: false, reason: decision, review };
+    if (review.outcome === "allow") return { allowed: true, reason: decision, review };
+    if (config.approval_policy === "never" || !ctx.hasUI) return { allowed: false, reason: `${decision} (no interactive UI available)`, review };
+    const choice = await ctx.ui.select(
+      `Auto review requires user decision\n\nTool: ${toolName}\nPath: ${path}\nReason: ${reason}\n\nReview: ${decision}`,
+      ["Allow once", "Deny"],
+      { timeout: 120000 }
+    );
+    return choice === "Allow once"
+      ? { allowed: true, reason: "approved by user after auto_review", review }
+      : { allowed: false, reason: "Denied by user after auto_review", review };
   }
   if (config.approval_policy === "never" || !ctx.hasUI) return { allowed: false, reason };
   const choice = await ctx.ui.select(

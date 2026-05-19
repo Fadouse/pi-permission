@@ -129,7 +129,7 @@ export function commandMatchesPrefix(command, prefixRule) {
   const prefix = normalizePrefixRule(prefixRule);
   if (!prefix.length) return false;
   const parsed = parseCommand(command);
-  // Codex prefix approvals are for one argv prefix, not arbitrary shell compounds.
+  // Prefix approvals are for one argv prefix, not arbitrary shell compounds.
   if (parsed.complex || parsed.commands.length !== 1) return false;
   const [tokens] = parsed.commands;
   return prefix.every((part, i) => tokens[i] === part);

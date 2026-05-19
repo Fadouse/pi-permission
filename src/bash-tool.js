@@ -3,6 +3,7 @@ import { assessCommand, isBannedPrefixRule, normalizePrefixRule } from "./comman
 import { createSandboxOperations, isSandboxAvailable, sandboxFailureText } from "./sandbox.js";
 import { audit } from "./audit.js";
 import { formatReviewDecision, reviewApprovalRequestWithModel, shouldAutoReview } from "./auto-review.js";
+import { normalizeEscalationReason } from "./escalation-reason.js";
 
 export const bashPermissionSchema = {
   type: "object",
@@ -13,9 +14,10 @@ export const bashPermissionSchema = {
     timeout: { type: "number", description: "Timeout in seconds (optional, no default timeout)" },
     sandbox_permissions: {
       enum: ["require_escalated"],
-      description: "Set to require_escalated to request unsandboxed execution under the active permission policy."
+      description: "Set to require_escalated to request unsandboxed execution under the active permission policy. Include a very short escalation_reason when useful."
     },
-    justification: { type: "string", description: "Required when requesting escalated/unsandboxed execution." },
+    escalation_reason: { type: "string", maxLength: 80, description: "Very short reason for escalation (<=80 chars). Example: 'retry without sandbox'." },
+    justification: { type: "string", maxLength: 80, description: "Backward-compatible alias for escalation_reason; keep it extremely short." },
     prefix_rule: {
       type: "array",
       items: { type: "string" },
@@ -29,21 +31,36 @@ function textResult(text, details = {}) {
 }
 
 async function promptApproval(ctx, { command, reason, justification, prefixRule, store, allowPersistence, config }) {
-  if (shouldAutoReview(config)) {
-    const review = await reviewApprovalRequestWithModel({ type: "bash", command, reason, justification }, ctx, config);
-    const decision = formatReviewDecision(review);
-    ctx.ui.notify?.(decision, review.outcome === "allow" ? "info" : "warning");
-    return review.outcome === "allow"
-      ? { allowed: true, scope: "auto_review", review }
-      : { allowed: false, reason: decision, review };
-  }
-  if (!ctx.hasUI) return { allowed: false, reason: `${reason} (no interactive UI available)` };
   const options = ["Allow once", "Deny"];
   if (allowPersistence && prefixRule?.length && !isBannedPrefixRule(prefixRule)) {
     options.splice(1, 0, "Allow prefix for session", "Allow prefix for project");
   }
+
+  if (shouldAutoReview(config)) {
+    const review = await reviewApprovalRequestWithModel({ type: "bash", command, reason, justification }, ctx, config);
+    const decision = formatReviewDecision(review);
+    ctx.ui.notify?.(decision, review.outcome === "allow" ? "info" : "warning");
+    if (review.outcome === "allow") return { allowed: true, scope: "auto_review", review };
+    if (!ctx.hasUI) return { allowed: false, reason: `${decision} (no interactive UI available)`, review };
+    const choice = await ctx.ui.select(
+      `Auto review requires user decision\n\nCommand:\n  ${command}\n\nReason: ${reason}${justification ? `\nEscalation reason: ${justification}` : ""}\n\nReview: ${decision}`,
+      options,
+      { timeout: 120000 }
+    );
+    if (choice === "Allow once") return { allowed: true, scope: "user-after-auto-review", review };
+    if (choice === "Allow prefix for session") {
+      store.addSessionPrefix(prefixRule, justification || reason);
+      return { allowed: true, scope: "session-prefix-after-auto-review", review };
+    }
+    if (choice === "Allow prefix for project") {
+      store.addProjectPrefix(prefixRule, justification || reason);
+      return { allowed: true, scope: "project-prefix-after-auto-review", review };
+    }
+    return { allowed: false, reason: "Denied by user after auto_review", review };
+  }
+  if (!ctx.hasUI) return { allowed: false, reason: `${reason} (no interactive UI available)` };
   const choice = await ctx.ui.select(
-    `Permission request\n\nCommand:\n  ${command}\n\nReason: ${reason}${justification ? `\nJustification: ${justification}` : ""}`,
+    `Permission request\n\nCommand:\n  ${command}\n\nReason: ${reason}${justification ? `\nEscalation reason: ${justification}` : ""}`,
     options,
     { timeout: 120000 }
   );
@@ -67,6 +84,7 @@ export function isLikelySandboxFailure(error) {
 export async function shouldRunUnsandboxed({ command, params, config, store, ctx }) {
   if (config.sandbox_mode === "danger-full-access") return { decision: "unsandboxed", reason: "danger-full-access" };
   const wantsEscalation = params.sandbox_permissions === "require_escalated";
+  const escalationReason = normalizeEscalationReason(params.escalation_reason ?? params.justification);
   const assessment = assessCommand(command, store.allPrefixes());
   if (store.isOnceApproved(command)) return { decision: wantsEscalation ? "unsandboxed" : "sandboxed", reason: "approved once" };
 
@@ -79,7 +97,7 @@ export async function shouldRunUnsandboxed({ command, params, config, store, ctx
     const approval = await promptApproval(ctx, {
       command,
       reason: "command is potentially dangerous",
-      justification: params.justification,
+      justification: escalationReason,
       prefixRule: normalizePrefixRule(params.prefix_rule || []),
       store,
       allowPersistence: false,
@@ -97,7 +115,7 @@ export async function shouldRunUnsandboxed({ command, params, config, store, ctx
     const approval = await promptApproval(ctx, {
       command,
       reason: "command is not in the trusted read-only set",
-      justification: params.justification,
+      justification: escalationReason,
       prefixRule,
       store,
       allowPersistence: true,
@@ -113,7 +131,7 @@ export async function shouldRunUnsandboxed({ command, params, config, store, ctx
     const approval = await promptApproval(ctx, {
       command,
       reason: "command requested unsandboxed execution",
-      justification: params.justification,
+      justification: escalationReason,
       prefixRule,
       store,
       allowPersistence: true,
@@ -140,14 +158,15 @@ export function registerPermissionedBash(pi, config, store, cwd) {
     ...template,
     name: "bash",
     label: `bash (${config.sandbox_mode})`,
-    description: `${template.description}\n\nThis bash tool is governed by pi-permission and uses a native sandbox. Use sandbox_permissions=\"require_escalated\" plus justification to request unsandboxed execution.`,
+    description: `${template.description}\n\nThis bash tool is governed by pi-permission and uses a native sandbox. Use sandbox_permissions=\"require_escalated\" plus a very short escalation_reason (<=80 chars) to request unsandboxed execution.`,
     parameters: bashPermissionSchema,
     promptGuidelines: [
       `Bash runs with sandbox_mode=${config.sandbox_mode} and approval_policy=${config.approval_policy}.`,
-      "Request escalation only with sandbox_permissions=\"require_escalated\" and a concise justification."
+      "Request escalation only with sandbox_permissions=\"require_escalated\" and a very short escalation_reason (<=80 chars, e.g. 'retry without sandbox'). In auto_review mode, low-risk requests may be approved automatically and higher-risk requests are shown to the user for the final decision."
     ],
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const command = String(params.command || "");
+      const escalationReason = normalizeEscalationReason(params.escalation_reason ?? params.justification);
       if (!command.trim()) return textResult("No command provided", { blocked: true });
       if (config.sandbox_mode !== "danger-full-access" && !(await isSandboxAvailable(config)) && config.fail_closed_without_sandbox) {
         const reason = sandboxFailureText(config);
@@ -169,7 +188,7 @@ export function registerPermissionedBash(pi, config, store, cwd) {
           const approval = await promptApproval(ctx, {
             command,
             reason: `sandboxed execution failed: ${error.message}`,
-            justification: params.justification,
+            justification: escalationReason,
             prefixRule: normalizePrefixRule(params.prefix_rule || []),
             store,
             allowPersistence: false,

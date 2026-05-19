@@ -1,6 +1,6 @@
 # pi-permission
 
-Native permission and sandbox extension for pi with Codex-compatible behavior.
+Native permission and sandbox extension for pi.
 
 ## What it implements
 
@@ -9,7 +9,8 @@ Native permission and sandbox extension for pi with Codex-compatible behavior.
 - Approval reviewers: `user`, `auto_review`.
 - Bash tool escalation fields:
   - `sandbox_permissions: "require_escalated"`
-  - `justification`
+  - `escalation_reason` (optional, <=80 chars; use only for a very short why)
+  - `justification` (backward-compatible alias)
   - `prefix_rule`
 - Native sandbox backend implemented by this plugin (Linux `bubblewrap`; macOS `sandbox-exec`/Seatbelt when available; unsupported platforms fail closed unless `danger-full-access`).
 - Path gating for pi `write`/`edit` matching sandbox mode.
@@ -74,16 +75,20 @@ Project config overrides global config; CLI flags override both. Use `/permissio
 
 ## Auto Review Mode
 
-`auto_review` matches Codex's auto-review permission mode: use `workspace-write`, `on-request`, restricted network, and route approval requests through a model reviewer before any user prompt.
+`auto_review` uses `workspace-write`, `on-request`, restricted network, and a model reviewer for approval requests. Low-risk requests can be approved automatically; higher-risk or uncertain reviews include risk level, complexity, and refusal reason, then prompt the user for the final allow/deny decision when an interactive UI is available. Without an interactive UI, non-allow reviews and reviewer failures remain fail-closed.
 
-Enable it with `--auto-review`, `--approvals-reviewer auto_review`, `/permission auto-review`, or `/permissions auto-review`. By default the reviewer uses the active pi model; set `auto_review_model`, `--auto-review-model provider/model-id`, or `/permission model provider/model-id` to use a dedicated reviewer model. The reviewer must return strict JSON (`{"outcome":"allow"}` or a risk/rationale object). Invalid output, timeout, auth failure, or model failure denies the request fail-closed.
+Enable it with `--auto-review`, `--approvals-reviewer auto_review`, `/permission auto-review`, or `/permissions auto-review`. By default the reviewer uses the active pi model; set `auto_review_model`, `--auto-review-model provider/model-id`, or `/permission model provider/model-id` to use a dedicated reviewer model. The reviewer must return strict JSON with `outcome`, `risk_level`, `complexity`, `rationale`, and optional `refusal_reason`.
 
 ## Native sandbox behavior
 
-This package does **not** call or depend on Codex CLI. It enforces the permission model directly in pi:
+This package enforces the permission model directly in pi:
 
 - Linux: `bubblewrap` with read-only root, writable cwd/`add_dir` roots (and temp when `allow_tmp_write` is true) in `workspace-write`, and network namespace isolation unless `network_access` is true.
 - macOS: `sandbox-exec` Seatbelt profile when available.
 - Windows/unsupported: fail closed unless the user explicitly selects `danger-full-access`.
 
 Non-bash pi tools cannot be placed inside the process sandbox by pi today, so `write` and `edit` are preflight-gated with the same read-only/workspace-write root policy, including temp writes when `allow_tmp_write` is enabled.
+
+## Acknowledgements
+
+Thanks to OpenAI Codex CLI for inspiring the permission-model design and portions of the implementation approach. Codex CLI GitHub repository: https://github.com/openai/codex
